@@ -1,25 +1,26 @@
 package com.orca.controller;
 
 
-import com.orca.domain.RegistrationResult;
-import com.orca.domain.ReservationData;
-import com.orca.domain.ReservationResult;
+import com.orca.domain.*;
 import com.orca.entities.Boat;
+import com.orca.entities.OperatingHour;
 import com.orca.entities.Reservation;
 import com.orca.entities.User;
 import com.orca.repository.BoatRepository;
 import com.orca.repository.ReservationRepository;
 import com.orca.repository.UserRepository;
+import org.hibernate.boot.jaxb.SourceType;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.StoredProcedureQuery;
+import javax.websocket.server.PathParam;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 public class ReservationController {
@@ -33,6 +34,10 @@ public class ReservationController {
 
     @Autowired
     private BoatRepository boatRepository;
+
+    @PersistenceContext
+    private EntityManager em;
+
 
     @RequestMapping(value =  "/reserve" ,  produces = "application/json")
     @PostMapping
@@ -86,4 +91,80 @@ public class ReservationController {
           }
       }
     }
+
+
+    @RequestMapping(value = "/get-available-hours" , produces =  "application/json" )
+    @PostMapping
+    public GetAvailableHoursResult getAvailableHours( @RequestBody AvailableHoursQuery availableHoursQuery ) {
+        Date reservationDate;
+        try {
+            reservationDate = new SimpleDateFormat("yyyy-MM-dd").parse(availableHoursQuery.getReservationDate());
+        } catch (ParseException e) {
+            return new GetAvailableHoursResult("Incorrect date format!");
+
+        }
+
+        StoredProcedureQuery storedProcedureQuery =  em.createNamedStoredProcedureQuery("getAvailableHours");
+        storedProcedureQuery.setParameter("reservationDate", reservationDate);
+        storedProcedureQuery.setParameter("boatType" , availableHoursQuery.getBoatType());
+
+         SimpleDateFormat sdf  = new SimpleDateFormat("HH:mm");
+
+        List<String> list = ((List<OperatingHour>)storedProcedureQuery.getResultList()).stream().map(hour -> sdf.format(hour.getWorkingHour())).collect(Collectors.toList());
+
+return new GetAvailableHoursResult(list);
+
+    }
+
+
+    @RequestMapping(value = "/reservationInfo"   , produces = "application/json")
+    @PostMapping
+    public ReservationList reservationInfo(@RequestBody GetReservationInfo getReservationInfo) {
+        User user;
+        Reservation reservation;
+
+        user = userRepository.findByEmail(getReservationInfo.getEmail());
+        if(user == null) {
+
+           throw new IllegalArgumentException("no user found with that e-mail");
+
+
+
+        }
+    else {
+            Calendar calendar = new GregorianCalendar();
+
+            calendar.set(Calendar.DAY_OF_WEEK , Calendar.MONDAY);
+             calendar.add(Calendar.DATE , 6);
+
+              return new ReservationList( reservationRepository.findByMemberBookedAndReservationDateBetween(user.getUserId() , new Date() , calendar.getTime() ));
+
+        }
+        }
+
+
+
+    @RequestMapping(value = "/cancel"   , produces = "application/json")
+    @PostMapping
+    public CancellationResult cancelReservation(@RequestBody CancellationInfo cancellationInfo) {
+Reservation reservation = null;
+
+
+     if((reservation = reservationRepository.findOne(cancellationInfo.getReservationId()))!= null)
+     {
+         reservationRepository.delete(reservation);
+         return new CancellationResult("Cancellation done successfully!");
+
+     } else {
+
+         return new CancellationResult("No reservation found with that reservationId!");
+
+
+     }
+
+
+
+    }
+
+
 }

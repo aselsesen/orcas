@@ -5,6 +5,8 @@ public class ReservationResult {
     private String result;
 
 
+
+
     public ReservationResult(String result) {
 
         this.result = result;

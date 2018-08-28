@@ -34,6 +34,9 @@ public class Reservation {
     private String memberBooked;
 
 
+    private transient DateRange dateRange;
+
+
     public Reservation() {
 
         setReservationId(UUID.randomUUID().toString());
@@ -87,6 +90,14 @@ public class Reservation {
 
     public void setMemberBooked(String memberBooked) {
         this.memberBooked = memberBooked;
+    }
+
+    public DateRange getDateRange() {
+        return dateRange;
+    }
+
+    public void setDateRange(DateRange dateRange) {
+        this.dateRange = dateRange;
     }
 }
 
